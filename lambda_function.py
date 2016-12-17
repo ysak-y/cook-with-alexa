@@ -16,7 +16,12 @@ def lambda_handler(request_obj, context=None):
     input 'request_obj' is JSON request converted into a nested python object.
     '''
 
-    metadata = {'user_name' : 'SomeRandomDude'} # add your own metadata to the request using key value pairs
+    metadata = {
+            'user_name' : 'SomeRandomDude',
+            'appliication': {
+                'application': ''
+                }
+            } # add your own metadata to the request using key value pairs
     
     ''' inject user relevant metadata into the request if you want to, here.    
     e.g. Something like : 
