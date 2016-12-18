@@ -206,12 +206,12 @@ def repeat_intent_handler(request):
 
 @alexa.intent('KnifeSkillIntent')
 def knife_skill_intent_handler(request):
-    skill_name = request.slots['KnifeSkill']
+    skill_name = request.slots['skill_name']
     skill_name = skill_name.replace(' ', '-')
     knife_skills = request.session['KnifeSkill']
     if skill_name in knife_skills:
         message = 'This is {}'.format(skill_name)
-        card = create_card(title=skill_name, content=knife_skills[skill_name], card_type='Standard')
+        card = alexa.create_card(title=skill_name, content=knife_skills[skill_name], card_type='Standard')
         image = {
                 'smallImageUrl': 'http://ekantcookcurry.com/wp-content/uploads/2013/01/img_4144.jpg',
                 'largeImageUrl': 'http://ekantcookcurry.com/wp-content/uploads/2013/01/img_4144.jpg'
