@@ -95,8 +95,8 @@ def start_cooking_intent_handler(request):
                     'amount': 'one tablespoon'
                     },
                 ],
-            'ingredient_index': -1,
-            'step_index': -1
+            'IngredientIndex': -1,
+            'StepIndex': -1
             }
 
     knife_skills = {
@@ -105,7 +105,7 @@ def start_cooking_intent_handler(request):
 
     request.session['State'] = 'READ_INGREDIENT'
     request.session['Recipe'] = recipe
-    request.session['KnifeSkill'] = knife_skill
+    request.session['KnifeSkill'] = knife_skills
     message = "ok lets cook {}. Are you ready?".format(recipe['name'])
 
     return alexa.create_response(message, end_session=False)
@@ -145,14 +145,13 @@ def create_resource_response(request):
     state = request.session['State']
     recipe = request.session['Recipe']
     if state == 'READ_INGREDIENT':
-        index = request.session['IngredientIndex']
+        index = recipe['IngredientIndex']
         message = create_resource_message(state, index, recipe['ingredients'])
         card = create_resource_card(state, index, recipe['ingredients'])
-
         return alexa.create_response(message, end_session=False, card_obj=card)
 
     elif state == 'READ_STEP':
-        index = request.session['StepIndex']
+        index = recipe['StepIndex']
         message = create_resource_message(state, index, recipe['steps'])
         card = create_resource_card(state, index, recipe['steps'])
 
@@ -163,22 +162,26 @@ def create_resource_response(request):
 
 @alexa.intent('NextIntent')
 def next_intent_handler(request):
+    end_session = False
     if request.session['State'] == 'READ_INGREDIENT':
-        request.session['IngredientIndex'] += 1
+        request.session['Recipe']['IngredientIndex'] += 1
+        if (request.session['Recipe']['IngredientIndex'] + 1) == len(request.session['ingredients']):
+            request.session['State'] = 'READ_STEP'
     elif request.session['State'] == 'READ_STEP':
-        request.session['StepIndex'] += 1
+        request.session['Recipe']['StepIndex'] += 1
+        if (request.session['Recipe']['StepIndex'] + 1) == len(request.session['steps']):
+            end_session = True
     else:
-        return create_response('I cant understand it.', end_session=False)
+        return create_response('I cant understand it.', end_session=end_session)
 
     return create_resource_response(request)
-
 
 @alexa.intent('BackIntent')
 def back_intent_handler(request):
     if request.session['State'] == 'READ_INGREDIENT':
-        request.session['IngredientIndex'] -= 1
+        request.session['Recipe']['IngredientIndex'] -= 1
     elif request.session['State'] == 'READ_STEP':
-        request.session['StepIndex'] -= 1
+        request.session['Recipe']['StepIndex'] -= 1
     else:
         return create_response('I cant understand it.', end_session=False)
 
@@ -189,9 +192,9 @@ def back_intent_handler(request):
 def index_intent_handler(request):
     index = request.slots['Index']
     if request.session['State'] == 'READ_INGREDIENT':
-        request.session['IngredientIndex'] = index
+        request.session['Recipe']['IngredientIndex'] = index
     elif request.session['State'] == 'READ_STEP':
-        request.session['StepIndex'] = index
+        request.session['Recipe']['StepIndex'] = index
     else:
         return create_response('I cant understand it.', end_session=False)
 
