@@ -5,8 +5,8 @@ Happy Hacking!
 """
 
 from ask import alexa
+import json
 import util
-import recipe
 
 def lambda_handler(request_obj, context=None):
     '''
@@ -33,10 +33,10 @@ def lambda_handler(request_obj, context=None):
     return alexa.route_request(request_obj, metadata)
 
 
-@alexa.default()
 def default_handler(request):
     """ The default handler gets invoked if no handler is set for a request type """
     return alexa.respond('Just ask').with_card('Hello World')
+alexa.default(default_handler)
 
 
 @alexa.request("LaunchRequest")
@@ -50,90 +50,198 @@ def session_ended_request_handler(request):
     return alexa.create_response(message="Goodbye!")
 
 @alexa.intent('StartCookingIntent')
-def start_cooking_intent(request):
-    attr = {
-            'recipe': {
-                'name': 'marinated chicken and paprika',
-                'step': {
+def start_cooking_intent_handler(request):
+    recipe = {
+            'name': 'marinated chicken and paprika',
+            'steps': [
+                'Cut the chicken thighs, onion, paprika in a size easy to eat',
+                'Stir fry paprika and onions with pepper and salt with a frying pan and take out once on a dish',
+                'Bake the chicken thigh from the skin with a frying pan',
+                'Put chicken thighs in the corner of the pan, add sugar and soy sauce, sake, vinegar in a frying pan, boil at a stretch, put 2 as well',
+                'Mix with chopsticks while heating as everything fits',
+                'Completion with dishes on the plate',
+            ],
+            'ingredients':[
+                {
+                    'name': 'chicken thign',
+                    'amount': 'one'
                     },
-                'ingredient':[
-                        {
-                            'name': 'chicken thign',
-                            'amount': 'one'
-                            },
-                        {
-                            'name': 'onion',
-                            'amount': 'one'
-                            },
-                        {
-                            'name': 'paprika',
-                            'amount': 'one'
-                            },
-                        {
-                            'name': 'salt',
-                            'amount': 'proper amount'
-                            },
-                        {
-                            'name': 'sugar',
-                            'amount': 'one tablespoon '
-                            },
-                        {
-                            'name': 'soy sause',
-                            'amount': 'two tablespoon'
-                            },
-                        {
-                            'name': 'sake',
-                            'amount': 'two tablespoon'
-                            },
-                        {
-                            'name': 'vinegar',
-                            'amount': 'one tablespoon'
-                            },
-                    ]
-                }
+                {
+                    'name': 'onion',
+                    'amount': 'one'
+                    },
+                {
+                    'name': 'paprika',
+                    'amount': 'one'
+                    },
+                {
+                    'name': 'salt',
+                    'amount': 'proper amount'
+                    },
+                {
+                    'name': 'sugar',
+                    'amount': 'one tablespoon '
+                    },
+                {
+                    'name': 'soy sause',
+                    'amount': 'two tablespoon'
+                    },
+                {
+                    'name': 'sake',
+                    'amount': 'two tablespoon'
+                    },
+                {
+                    'name': 'vinegar',
+                    'amount': 'one tablespoon'
+                    },
+                ]
             }
-    attr['state'] = 'READY'
-    message = "ok lets cook {}. Are you ready?".format(attr['recipe']['name'])
-    res = alexa.create_response(message, end_session=False)
-    res.set_session(attr)
-    return res
 
-@alexa.intent('GetRecipeIntent')
-def get_recipe_intent_handler(request):
-    """
-    You can insert arbitrary business logic code here    
-    """
+    knife_skills = {
+            'mince cut': 'http://ekantcookcurry.com/wp-content/uploads/2013/01/img_4144.jpg'
+            }
 
-    # Get variables like userId, slots, intent name etc from the 'Request' object
-    ingredient = request.slots["Ingredient"]  # Gets an Ingredient Slot from the Request object.
-    
-    if ingredient == None:
-        return alexa.create_response("Could not find an ingredient!")
+    request.session['state'] = 'READ_INGREDIENT'
+    request.session['ingredient_index'] = 0
+    request.session['recipe'] = recipe
+    message = "ok lets cook {}. Are you ready?".format(recipe['name'])
 
-    # All manipulations to the request's session object are automatically reflected in the request returned to Amazon.
-    # For e.g. This statement adds a new session attribute (automatically returned with the response) storing the
-    # Last seen ingredient value in the 'last_ingredient' key. 
+    return alexa.create_response(message, end_session=False)
 
-    request.session['last_ingredient'] = ingredient # Automatically returned as a sessionAttribute
-    
-    # Modifying state like this saves us from explicitly having to return Session objects after every response
+@alexa.intent('YesIntent')
+def yes_intent_handler(request):
 
-    # alexa can also build cards which can be sent as part of the response
-    card = alexa.create_card(title="GetRecipeIntent activated", subtitle=None,
-                             content="asked alexa to find a recipe using {}".format(ingredient))    
+    if request.session['state'] == 'READ_INGREDIENT':
+        recipe = request.session['recipe']
+        ingredient_index = request.session['ingredient_index']
+        ingredient = recipe['ingredients'][ingredient_index]
+        message = '{0} {1}.'.format(ingredient['name'], ingredient['amount'])
 
-    return alexa.create_response("Finding a recipe with the ingredient {}".format(ingredient),
-                                 end_session=False, card_obj=card)
+        card = alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
+
+        if (ingredient_index + 1) == len(recipe['ingredients']):
+            message += 'ingredient finish. will read steps'
+            request.session['state'] = 'READ_STEP'
+            request.session['step_index'] = 0
+        else:
+            message += 'will read next. okay?'
+            request.session['ingredient_index'] = ingredient_index + 1
+        return alexa.create_response(message, end_session=False, card_obj=card)
+
+    elif request.session['state'] == 'READ_STEP':
+
+        recipe = request.session['recipe']
+        step_index = request.session['step_index']
+        step = recipe['steps'][step_index]
+        message = '{0}.'.format(step)
+        card = alexa.create_card(title='Step {}'.format(step_index), content=step[step_index])
+
+        if (step_index + 1) == len(recipe['steps']):
+            message += 'step finish. will read steps'
+            request.session['state'] = 'READ_STEP'
+        else:
+            message += 'will read next. okay?'
+            request.session['step_index'] = step_index + 1
+        return alexa.create_response(message, end_session=False, card_obj=card)
+
+    else:
+        message = 'I cant find answer. one more please'
+        return alexa.create_response(message, end_session=False)
+
+@alexa.intent('BackIntent')
+def back_intent_handler(request):
+
+    if request.session['state'] == 'READ_INGREDIENT':
+        recipe = request.session['recipe']
+        ingredient_index = request.session['ingredient_index']
+        ingredient = recipe['ingredients'][ingredient_index]
+        message = '{0} {1}.'.format(ingredient['name'], ingredient['amount'])
+
+        card = alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
+
+        if (ingredient_index + 1) == len(recipe['ingredients']):
+            message += 'ingredient finish. will read steps'
+            request.session['state'] = 'READ_STEP'
+            request.session['step_index'] = 0
+        else:
+            message += 'will read next. okay?'
+            request.session['ingredient_index'] = ingredient_index + 1
+        return alexa.create_response(message, end_session=False, card_obj=card)
+
+    elif request.session['state'] == 'READ_STEP':
+
+        recipe = request.session['recipe']
+        step_index = request.session['step_index']
+        step = recipe['steps'][step_index]
+        message = '{0}.'.format(step)
+        card = alexa.create_card(title='Step {}'.format(step_index), content=step[step_index])
+
+        if (step_index + 1) == len(recipe['steps']):
+            message += 'step finish. will read steps'
+            request.session['state'] = 'READ_STEP'
+        else:
+            message += 'will read next. okay?'
+            request.session['step_index'] = step_index + 1
+        return alexa.create_response(message, end_session=False, card_obj=card)
+
+    else:
+        message = 'I cant find answer. one more please'
+        return alexa.create_response(message, end_session=False)
+
+@alexa.intent('IndexIntent')
+def index_intent_handler(request):
+    if request.session['state'] == 'READ_INGREDIENT':
+        recipe = request.session['recipe']
+        ingredient_index = request.session['ingredient_index']
+        ingredient = recipe['ingredients'][ingredient_index]
+        message = '{0} {1}.'.format(ingredient['name'], ingredient['amount'])
+
+        card = alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
+
+        if (ingredient_index + 1) == len(recipe['ingredients']):
+            message += 'ingredient finish. will read steps'
+            request.session['state'] = 'READ_STEP'
+            request.session['step_index'] = 0
+        else:
+            message += 'will read next. okay?'
+            request.session['ingredient_index'] = ingredient_index + 1
+        return alexa.create_response(message, end_session=False, card_obj=card)
+
+    elif request.session['state'] == 'READ_STEP':
+
+        recipe = request.session['recipe']
+        step_index = request.session['step_index']
+        step = recipe['steps'][step_index]
+        message = '{0}.'.format(step)
+        card = alexa.create_card(title='Step {}'.format(step_index), content=step[step_index])
+
+        if (step_index + 1) == len(recipe['steps']):
+            message += 'step finish. will read steps'
+            request.session['state'] = 'READ_STEP'
+        else:
+            message += 'will read next. okay?'
+            request.session['step_index'] = step_index + 1
+        return alexa.create_response(message, end_session=False, card_obj=card)
+
+    else:
+        message = 'I cant find answer. one more please'
+        return alexa.create_response(message, end_session=False)
 
 
+@alexa.intent('RepeatIntent')
+def repeat_intent_handler(request):
+    if request.session['state'] == 'READ_INGREDIENT':
+        idx = request.session['ingredient_index']
+        ingredient = request.session['recipe']['ingredients'][idx]
+        message = '{0} {1}.'.format(ingredient['name'], ingredient['amount'])
+    elif request.session['state'] == 'READ_STEP':
+        idx = request.session['step_index']
+        step = request.session['recipe']['steps'][idx]
+        message = '{}.'.format(step)
+    else:
+        message = 'i cant find answer. one more please'
 
-@alexa.intent('NextRecipeIntent')
-def next_recipe_intent_handler(request):
-    """
-    You can insert arbitrary business logic code here
-    """
-    return alexa.create_response(message="Getting Next Recipe ... 123")
-
+    return alexa.create_response(message, end_session=False)
 
 if __name__ == "__main__":    
     
@@ -154,4 +262,3 @@ if __name__ == "__main__":
             request_obj = flask.request.get_json()
             return lambda_handler(request_obj)
         server.run()
-    
