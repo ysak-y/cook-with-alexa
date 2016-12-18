@@ -100,7 +100,7 @@ def start_cooking_intent_handler(request):
             }
 
     knife_skills = {
-            'mince cut': 'http://ekantcookcurry.com/wp-content/uploads/2013/01/img_4144.jpg'
+            'mince-cut': 'http://ekantcookcurry.com/wp-content/uploads/2013/01/img_4144.jpg'
             }
 
     request.session['State'] = 'READ_INGREDIENT'
@@ -137,7 +137,7 @@ def create_resource_card(state, index, resources):
         return alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
     elif state == 'READ_STEP':
         step = resources[index]
-        return alexa.create_card(title='Step {}'.format(index), content=step[index])
+        return alexa.create_card(title='Step {}'.format(index), content=step)
     else:
         return 'Sorry, I cant find answer'
 
@@ -165,11 +165,11 @@ def next_intent_handler(request):
     end_session = False
     if request.session['State'] == 'READ_INGREDIENT':
         request.session['Recipe']['IngredientIndex'] += 1
-        if (request.session['Recipe']['IngredientIndex'] + 1) == len(request.session['ingredients']):
+        if (request.session['Recipe']['IngredientIndex'] + 1) == len(request.session['Recipe']['ingredients']):
             request.session['State'] = 'READ_STEP'
     elif request.session['State'] == 'READ_STEP':
         request.session['Recipe']['StepIndex'] += 1
-        if (request.session['Recipe']['StepIndex'] + 1) == len(request.session['steps']):
+        if (request.session['Recipe']['StepIndex'] + 1) == len(request.session['Recipe']['steps']):
             end_session = True
     else:
         return create_response('I cant understand it.', end_session=end_session)
@@ -207,6 +207,7 @@ def repeat_intent_handler(request):
 @alexa.intent('KnifeSkillIntent')
 def knife_skill_intent_handler(request):
     skill_name = request.slots['KnifeSkill']
+    skill_name = skill_name.replace(' ', '-')
     knife_skills = request.session['KnifeSkill']
     if skill_name in knife_skills:
         message = 'This is {}'.format(skill_name)
