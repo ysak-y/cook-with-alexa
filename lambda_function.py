@@ -94,154 +94,128 @@ def start_cooking_intent_handler(request):
                     'name': 'vinegar',
                     'amount': 'one tablespoon'
                     },
-                ]
+                ],
+            'ingredient_index': -1,
+            'step_index': -1
             }
 
     knife_skills = {
             'mince cut': 'http://ekantcookcurry.com/wp-content/uploads/2013/01/img_4144.jpg'
             }
 
-    request.session['state'] = 'READ_INGREDIENT'
-    request.session['ingredient_index'] = 0
-    request.session['recipe'] = recipe
+    request.session['State'] = 'READ_INGREDIENT'
+    request.session['Recipe'] = recipe
+    request.session['KnifeSkill'] = knife_skill
     message = "ok lets cook {}. Are you ready?".format(recipe['name'])
 
     return alexa.create_response(message, end_session=False)
 
-@alexa.intent('YesIntent')
-def yes_intent_handler(request):
-
-    if request.session['state'] == 'READ_INGREDIENT':
-        recipe = request.session['recipe']
-        ingredient_index = request.session['ingredient_index']
-        ingredient = recipe['ingredients'][ingredient_index]
-        message = '{0} {1}.'.format(ingredient['name'], ingredient['amount'])
-
-        card = alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
-
-        if (ingredient_index + 1) == len(recipe['ingredients']):
-            message += 'ingredient finish. will read steps'
-            request.session['state'] = 'READ_STEP'
-            request.session['step_index'] = 0
+def create_resource_message(state, index, resources):
+    message = ''
+    if state == 'READ_INGREDIENT':
+        ingredient = resources[index]
+        message += '{0} {1}'.format(ingredient['name'], ingredient['amount'])
+        if (index + 1) == len(resources):
+            message += '. Will read step.'
         else:
-            message += 'will read next. okay?'
-            request.session['ingredient_index'] = ingredient_index + 1
+            message += '. Will read next. okay?'
+    elif state == 'READ_STEP':
+        step = resources[index]
+        message += step
+        if (index + 1) == len(resources):
+            message += '. Finish. Lets eat!!'
+        else:
+            message += '. Will read next. okay?'
+    else:
+        return 'Sorry, I cant find answer'
+
+    return message
+
+def create_resource_card(state, index, resources):
+    if state == 'READ_INGREDIENT':
+        ingredient = resources[index]
+        return alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
+    elif state == 'READ_STEP':
+        step = resources[index]
+        return alexa.create_card(title='Step {}'.format(index), content=step[index])
+    else:
+        return 'Sorry, I cant find answer'
+
+def create_resource_response(request):
+    state = request.session['State']
+    recipe = request.session['Recipe']
+    if state == 'READ_INGREDIENT':
+        index = request.session['IngredientIndex']
+        message = create_resource_message(state, index, recipe['ingredients'])
+        card = create_resource_card(state, index, recipe['ingredients'])
+
         return alexa.create_response(message, end_session=False, card_obj=card)
 
-    elif request.session['state'] == 'READ_STEP':
+    elif state == 'READ_STEP':
+        index = request.session['StepIndex']
+        message = create_resource_message(state, index, recipe['steps'])
+        card = create_resource_card(state, index, recipe['steps'])
 
-        recipe = request.session['recipe']
-        step_index = request.session['step_index']
-        step = recipe['steps'][step_index]
-        message = '{0}.'.format(step)
-        card = alexa.create_card(title='Step {}'.format(step_index), content=step[step_index])
-
-        if (step_index + 1) == len(recipe['steps']):
-            message += 'step finish. will read steps'
-            request.session['state'] = 'READ_STEP'
-        else:
-            message += 'will read next. okay?'
-            request.session['step_index'] = step_index + 1
         return alexa.create_response(message, end_session=False, card_obj=card)
-
     else:
         message = 'I cant find answer. one more please'
         return alexa.create_response(message, end_session=False)
+
+@alexa.intent('NextIntent')
+def next_intent_handler(request):
+    if request.session['State'] == 'READ_INGREDIENT':
+        request.session['IngredientIndex'] += 1
+    elif request.session['State'] == 'READ_STEP':
+        request.session['StepIndex'] += 1
+    else:
+        return create_response('I cant understand it.', end_session=False)
+
+    return create_resource_response(request)
+
 
 @alexa.intent('BackIntent')
 def back_intent_handler(request):
-
-    if request.session['state'] == 'READ_INGREDIENT':
-        recipe = request.session['recipe']
-        ingredient_index = request.session['ingredient_index']
-        ingredient = recipe['ingredients'][ingredient_index]
-        message = '{0} {1}.'.format(ingredient['name'], ingredient['amount'])
-
-        card = alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
-
-        if (ingredient_index + 1) == len(recipe['ingredients']):
-            message += 'ingredient finish. will read steps'
-            request.session['state'] = 'READ_STEP'
-            request.session['step_index'] = 0
-        else:
-            message += 'will read next. okay?'
-            request.session['ingredient_index'] = ingredient_index + 1
-        return alexa.create_response(message, end_session=False, card_obj=card)
-
-    elif request.session['state'] == 'READ_STEP':
-
-        recipe = request.session['recipe']
-        step_index = request.session['step_index']
-        step = recipe['steps'][step_index]
-        message = '{0}.'.format(step)
-        card = alexa.create_card(title='Step {}'.format(step_index), content=step[step_index])
-
-        if (step_index + 1) == len(recipe['steps']):
-            message += 'step finish. will read steps'
-            request.session['state'] = 'READ_STEP'
-        else:
-            message += 'will read next. okay?'
-            request.session['step_index'] = step_index + 1
-        return alexa.create_response(message, end_session=False, card_obj=card)
-
+    if request.session['State'] == 'READ_INGREDIENT':
+        request.session['IngredientIndex'] -= 1
+    elif request.session['State'] == 'READ_STEP':
+        request.session['StepIndex'] -= 1
     else:
-        message = 'I cant find answer. one more please'
-        return alexa.create_response(message, end_session=False)
+        return create_response('I cant understand it.', end_session=False)
+
+    return create_resource_response(request)
+
 
 @alexa.intent('IndexIntent')
 def index_intent_handler(request):
-    if request.session['state'] == 'READ_INGREDIENT':
-        recipe = request.session['recipe']
-        ingredient_index = request.session['ingredient_index']
-        ingredient = recipe['ingredients'][ingredient_index]
-        message = '{0} {1}.'.format(ingredient['name'], ingredient['amount'])
-
-        card = alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
-
-        if (ingredient_index + 1) == len(recipe['ingredients']):
-            message += 'ingredient finish. will read steps'
-            request.session['state'] = 'READ_STEP'
-            request.session['step_index'] = 0
-        else:
-            message += 'will read next. okay?'
-            request.session['ingredient_index'] = ingredient_index + 1
-        return alexa.create_response(message, end_session=False, card_obj=card)
-
-    elif request.session['state'] == 'READ_STEP':
-
-        recipe = request.session['recipe']
-        step_index = request.session['step_index']
-        step = recipe['steps'][step_index]
-        message = '{0}.'.format(step)
-        card = alexa.create_card(title='Step {}'.format(step_index), content=step[step_index])
-
-        if (step_index + 1) == len(recipe['steps']):
-            message += 'step finish. will read steps'
-            request.session['state'] = 'READ_STEP'
-        else:
-            message += 'will read next. okay?'
-            request.session['step_index'] = step_index + 1
-        return alexa.create_response(message, end_session=False, card_obj=card)
-
+    index = request.slots['Index']
+    if request.session['State'] == 'READ_INGREDIENT':
+        request.session['IngredientIndex'] = index
+    elif request.session['State'] == 'READ_STEP':
+        request.session['StepIndex'] = index
     else:
-        message = 'I cant find answer. one more please'
-        return alexa.create_response(message, end_session=False)
+        return create_response('I cant understand it.', end_session=False)
 
+    return create_resource_response(request)
 
 @alexa.intent('RepeatIntent')
 def repeat_intent_handler(request):
-    if request.session['state'] == 'READ_INGREDIENT':
-        idx = request.session['ingredient_index']
-        ingredient = request.session['recipe']['ingredients'][idx]
-        message = '{0} {1}.'.format(ingredient['name'], ingredient['amount'])
-    elif request.session['state'] == 'READ_STEP':
-        idx = request.session['step_index']
-        step = request.session['recipe']['steps'][idx]
-        message = '{}.'.format(step)
-    else:
-        message = 'i cant find answer. one more please'
+    return create_resource_response(request)
 
-    return alexa.create_response(message, end_session=False)
+@alexa.intent('KnifeSkillIntent')
+def knife_skill_intent_handler(request):
+    skill_name = request.slots['KnifeSkill']
+    knife_skills = request.session['KnifeSkill']
+    if skill_name in knife_skills:
+        message = 'This is {}'.format(skill_name)
+        card = create_card(title=skill_name, content=knife_skills[skill_name], card_type='Standard')
+        image = {
+                'smallImageUrl': 'http://ekantcookcurry.com/wp-content/uploads/2013/01/img_4144.jpg',
+                'largeImageUrl': 'http://ekantcookcurry.com/wp-content/uploads/2013/01/img_4144.jpg'
+                }
+        card['image'] = image
+        return alexa.create_response(message, card_obj=card, end_session=False)
+    else:
+        return alexa.create_response('I cant find answer.')
 
 if __name__ == "__main__":    
     
