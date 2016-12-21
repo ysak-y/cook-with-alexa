@@ -49,6 +49,10 @@ def launch_request_handler(request):
 def session_ended_request_handler(request):
     return alexa.create_response(message="Goodbye!")
 
+@alexa.intent("AMAZON.StopIntent")
+def stop_intent_handler(request):
+    return alexa.create_response(message="Goodbye!")
+
 @alexa.intent('StartCookingIntent')
 def start_cooking_intent_handler(request):
     recipe = {
@@ -133,8 +137,14 @@ def create_resource_message(state, index, resources):
 
 def create_resource_card(state, index, resources):
     if state == 'READ_INGREDIENT':
-        ingredient = resources[index]
-        return alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
+        #ingredient = resources[index]
+        content = '<table>'
+        for ingredient in resources:
+            tag = '<tr><td>{0}</td><td>{1}</td></tr>'.format(ingredient['name'], ingredient['amount'])
+            content += tag
+        content += '</table>'
+        return alexa.create_card(title='Ingredients', content=content)
+        #return alexa.create_card(title=ingredient['name'], content=ingredient['amount'])
     elif state == 'READ_STEP':
         step = resources[index]
         return alexa.create_card(title='Step {}'.format(index), content=step)
